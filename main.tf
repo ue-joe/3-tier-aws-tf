@@ -15,6 +15,7 @@ provider "aws" {
 # Create a VPC
 resource "aws_vpc" "my-vpc" {
   cidr_block = "10.0.0.0/16"
+  enable_dns_hostnames = true
   tags = {
     Name = "UE Prod VPC"
   }
@@ -112,6 +113,20 @@ data "local_file" "userdata_db" {
     filename = "${path.module}/install_db.sh"
 }
 
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+  }
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+  owners = ["099720109477"] # Canonical
+}
+
+
 #Create EC2 Instance
 resource "aws_instance" "webserver1" {
   ami                    = "ami-0d5eff06f840b45e9"
@@ -158,7 +173,7 @@ resource "aws_instance" "db1" {
 
 #Create Jumpbox Instance
 resource "aws_instance" "jumpbox" {
-  ami                    = "ami-0d5eff06f840b45e9"
+  ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t2.micro"
   availability_zone      = "us-east-1c"
   vpc_security_group_ids = [aws_security_group.jumpbox-sg.id]
@@ -323,4 +338,9 @@ resource "aws_lb_listener" "external-elb" {
 output "lb_dns_name" {
   description = "The DNS name of the load balancer"
   value       = aws_lb.external-elb.dns_name
+}
+
+output "vpc_id" {
+  description = "The VPC ID of this environment"
+  value = aws_vpc.my-vpc.id
 }
