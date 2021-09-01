@@ -20,6 +20,18 @@ resource "aws_vpc" "my-vpc" {
   }
 }
 
+# Create Management Subnet
+resource "aws_subnet" "management-subnet" {
+  vpc_id                  = aws_vpc.my-vpc.id
+  cidr_block              = "10.0.0.0/24"
+  availability_zone       = "us-east-1c"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "Management"
+  }
+}
+
 # Create Web Public Subnet
 resource "aws_subnet" "web-subnet-1" {
   vpc_id                  = aws_vpc.my-vpc.id
@@ -42,50 +54,6 @@ resource "aws_subnet" "web-subnet-2" {
     Name = "Web-2b"
   }
 }
-
-# Create Application Public Subnet
-resource "aws_subnet" "application-subnet-1" {
-  vpc_id                  = aws_vpc.my-vpc.id
-  cidr_block              = "10.0.11.0/24"
-  availability_zone       = "us-east-1a"
-  map_public_ip_on_launch = false
-
-  tags = {
-    Name = "Application-1a"
-  }
-}
-
-resource "aws_subnet" "application-subnet-2" {
-  vpc_id                  = aws_vpc.my-vpc.id
-  cidr_block              = "10.0.12.0/24"
-  availability_zone       = "us-east-1b"
-  map_public_ip_on_launch = false
-
-  tags = {
-    Name = "Application-2b"
-  }
-}
-
-# Create Database Private Subnet
-# resource "aws_subnet" "database-subnet-1" {
-#   vpc_id            = aws_vpc.my-vpc.id
-#   cidr_block        = "10.0.21.0/24"
-#   availability_zone = "us-east-1a"
-
-#   tags = {
-#     Name = "Database-1a"
-#   }
-# }
-
-# resource "aws_subnet" "database-subnet-2" {
-#   vpc_id            = aws_vpc.my-vpc.id
-#   cidr_block        = "10.0.22.0/24"
-#   availability_zone = "us-east-1b"
-
-#   tags = {
-#     Name = "Database-2b"
-#   }
-# }
 
 resource "aws_subnet" "database-subnet" {
   vpc_id            = aws_vpc.my-vpc.id
@@ -132,6 +100,11 @@ resource "aws_route_table_association" "b" {
   route_table_id = aws_route_table.web-rt.id
 }
 
+resource "aws_route_table_association" "c" {
+  subnet_id      = aws_subnet.management-subnet.id
+  route_table_id = aws_route_table.web-rt.id
+}
+
 data "local_file" "userdata_web" {
     filename = "${path.module}/install_apache.sh"
 }
@@ -150,8 +123,8 @@ resource "aws_instance" "webserver1" {
 
   tags = {
     Name = "Web Server"
+    AnsibleGroup = "web_servers"
   }
-
 }
 
 resource "aws_instance" "webserver2" {
@@ -164,8 +137,8 @@ resource "aws_instance" "webserver2" {
 
   tags = {
     Name = "Web Server"
+    AnsibleGroup = "web_servers"
   }
-
 }
 
 #Create EC2 Instance
@@ -179,9 +152,24 @@ resource "aws_instance" "db1" {
 
   tags = {
     Name = "Database Server"
+    AnsibleGroup = "database_servers"
   }
-
 }
+
+#Create Jumpbox Instance
+resource "aws_instance" "jumpbox" {
+  ami                    = "ami-0d5eff06f840b45e9"
+  instance_type          = "t2.micro"
+  availability_zone      = "us-east-1c"
+  vpc_security_group_ids = [aws_security_group.jumpbox-sg.id]
+  subnet_id              = aws_subnet.management-subnet.id
+  
+  tags = {
+    Name = "Jumpbox"
+    AnsibleGroup = "management_servers"
+  }
+}
+
 # Create Web Security Group
 resource "aws_security_group" "web-sg" {
   name        = "Web-SG"
@@ -260,6 +248,32 @@ resource "aws_security_group" "database-sg" {
   }
 }
 
+# Create Jumpbox Security Group
+resource "aws_security_group" "jumpbox-sg" {
+  name        = "Jumpbox-SG"
+  description = "Allow SSH inbound from Workstation"
+  vpc_id      = aws_vpc.my-vpc.id
+
+  ingress {
+    description = "SSH from Workstation"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["1.2.3.4/32"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "Jumpbox-SG"
+  }
+}
+
 resource "aws_lb" "external-elb" {
   name               = "External-LB"
   internal           = false
@@ -305,29 +319,6 @@ resource "aws_lb_listener" "external-elb" {
     target_group_arn = aws_lb_target_group.external-elb.arn
   }
 }
-
-# resource "aws_db_instance" "default" {
-#   allocated_storage      = 10
-#   db_subnet_group_name   = aws_db_subnet_group.default.id
-#   engine                 = "mysql"
-#   engine_version         = "8.0.20"
-#   instance_class         = "db.t2.micro"
-#   multi_az               = true
-#   name                   = "mydb"
-#   username               = "username"
-#   password               = "password"
-#   skip_final_snapshot    = true
-#   vpc_security_group_ids = [aws_security_group.database-sg.id]
-# }
-
-# resource "aws_db_subnet_group" "default" {
-#   name       = "main"
-#   subnet_ids = [aws_subnet.database-subnet-1.id, aws_subnet.database-subnet-2.id]
-
-#   tags = {
-#     Name = "My DB subnet group"
-#   }
-# }
 
 output "lb_dns_name" {
   description = "The DNS name of the load balancer"
