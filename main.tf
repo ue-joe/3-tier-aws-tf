@@ -129,7 +129,7 @@ data "aws_ami" "ubuntu" {
 
 #Create EC2 Instance
 resource "aws_instance" "webserver1" {
-  ami                    = "ami-0d5eff06f840b45e9"
+  ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t2.micro"
   availability_zone      = "us-east-1a"
   vpc_security_group_ids = [aws_security_group.webserver-sg.id]
@@ -143,7 +143,7 @@ resource "aws_instance" "webserver1" {
 }
 
 resource "aws_instance" "webserver2" {
-  ami                    = "ami-0d5eff06f840b45e9"
+  ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t2.micro"
   availability_zone      = "us-east-1b"
   vpc_security_group_ids = [aws_security_group.webserver-sg.id]
@@ -158,7 +158,7 @@ resource "aws_instance" "webserver2" {
 
 #Create EC2 Instance
 resource "aws_instance" "db1" {
-  ami                    = "ami-0d5eff06f840b45e9"
+  ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t2.micro"
   availability_zone      = "us-east-1a"
   vpc_security_group_ids = [aws_security_group.database-sg.id]
@@ -170,7 +170,10 @@ resource "aws_instance" "db1" {
     AnsibleGroup = "database_servers"
   }
 }
-
+resource "aws_key_pair" "jumpbox_ssh"{
+  key_name   = "jumpbox-key"
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC5LZD9Ab+l+DfTTZigOhdx5mqHYkttDLkRSw8ZPzhXvj12gfLetWqZDZVLu+wFSGxeAqZtn7GhVIbTjCuQUfBPhaq9nn40GAxJJYJEehuoonTaFOdGBpvfpkRYf61gOQHW7D7AK7BuCVC8BPeCtCOvQNJnIoXS24GaxMKZCoYldrSBPfhA80J0aZLXQ4yoWIrqXIMekCWvblrXRDaN5pkeIFKvxDnrew1oUlzOQAJCAVL+4EUri7ICrPVw3t5bJbolVbUUlcsLndJ5snIXoV4QomTmRR0ZOI8ZIVkSbOdzIzVXwrwTof8rqWZU3YkNPAOL/eUWVK6/RfcKR0iF7J6jav4LEKWkJreDqwg1gKWw9ruXHytTF3WZmXn0YO4HXXjaL+qbF6gNf5aXDsPlgl/ewtApr3Ucxn1vl/QIk+jdP8rY+51lKNHI/ywfyMbYmvNlyc9/vvfGuHCaD0vssb8MjrYFoYDuf0j8r5jGksBO88AsdcRYOP76Cor7TSHF7B8= vagrant@ubuntu-focal"
+}
 #Create Jumpbox Instance
 resource "aws_instance" "jumpbox" {
   ami                    = data.aws_ami.ubuntu.id
@@ -178,7 +181,7 @@ resource "aws_instance" "jumpbox" {
   availability_zone      = "us-east-1c"
   vpc_security_group_ids = [aws_security_group.jumpbox-sg.id]
   subnet_id              = aws_subnet.management-subnet.id
-  
+  key_name               = "jumpbox-key"
   tags = {
     Name = "Jumpbox"
     AnsibleGroup = "management_servers"
