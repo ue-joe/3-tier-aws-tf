@@ -5,6 +5,14 @@ terraform {
       version = "~> 3.0"
     }
   }
+  backend "remote" {
+    organization = "UEDEMO"
+
+    workspaces {
+      name = "AWSPROD"
+    }
+  }
+
 }
 
 # Configure the AWS Provider
